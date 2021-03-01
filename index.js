@@ -1,11 +1,13 @@
 require('dotenv').config();
 const config = require('./config.json');
+const fetch = require("node-fetch");
 
 const Discord = require('discord.js');
-const fs = require('fs');
 const bot = new Discord.Client();
 const TOKEN = process.env.TOKEN;
 const PREFIX = config.prefix;
+const ENDPOINT = config.endpoint;
+
 const bossChannelID = config.bossChannelID;
 const prefix_len = PREFIX.length;
 //'0 0 * * MON'
@@ -14,41 +16,35 @@ var job = new CronJob('0 0 * * MON', function() {
   sendBossMessage();
 }, null, true, 'Asia/Taipei');
 
+var keepAwake = new CronJob('*/25 * * * *', function() {
+  fetch(ENDPOINT,{method: "HEAD"})
+}, null, true, 'Asia/Taipei');
+
 job.start();
+keepAwake.start();
 bot.login(TOKEN);
 
 bot.on('ready', () => {
   console.info("Discord SiuMui online");
-    fetchBossChannel()
-    .then((channel)=>{
-      console.log("Successful found channel "+channel.name);
-    })
-    .catch(()=>{
+    let bossChannel = fetchBossChannel();
+    if(bossChannel!==undefined){
+      console.log("Successful found channel "+bossChannel.name);
+    }
+    else{
       console.log("Boss channel is not found! Fix your config.");
       bot.destroy();
-    })
+  }
 });
 
 function fetchBossChannel(){
-  return new Promise((resolve, reject) => {
-      let bossChannel = bot.channels.cache.get(bossChannelID);
-      (bossChannel !== undefined)? resolve(bossChannel) : reject(new Error());
-  });
+  return bot.channels.cache.get(bossChannelID);
 }
 
 async function fetchBossMessage(){
-  fetchBossChannel()
-  .then(bossChannel=>{
-    bossChannel.messages.fetchPinned()
-    .then((messages)=>{
-      bossChannel.send("message id is : "+messages.filter(message => message.author === bot.user).first().id);
-      return messages.filter(message => message.author === bot.user).first();
-    })
-  .catch(error=>{
-    bossChannel.send("No old boss message found!");
-    return error;
-  })
-  })
+  let bossChannel = fetchBossChannel();
+  let messages = await bossChannel.messages.fetchPinned();
+  let bossMessage = await bossChannel.messages.fetch(messages.filter(message => message.author === bot.user).first().id,true,true);
+  return bossMessage;
 }
 
 async function fetchEmote(){
@@ -61,66 +57,70 @@ async function fetchEmote(){
       "F":[],
       "G":[],
   }
+  let message = await fetchBossMessage();
 
-  await fetchBossMessage()
-  .then(async(message)=>{
-
-   await message.reactions.resolve("🇦").users.fetch()
-   .then(userList=>{
-    data.A = userList.filter(user=>!user.bot).map(user=>user.username);
-    })
-
-   await message.reactions.resolve("🇧").users.fetch()
-   .then(userList=>{
-    data.B = userList.filter(user=>!user.bot).map(user=>user.username);
+  await message.reactions.resolve("🇦").users.fetch()
+  .then(userList=>{
+   data.A = userList.filter(user=>!user.bot).map(user=>user.username);
    })
+  await message.reactions.resolve("🇧").users.fetch()
+  .then(userList=>{
+   data.B = userList.filter(user=>!user.bot).map(user=>user.username);
+  })
+  await message.reactions.resolve("🇨").users.fetch()
+  .then(userList=>{
+   data.C = userList.filter(user=>!user.bot).map(user=>user.username);
+  })
+  await message.reactions.resolve("🇩").users.fetch()
+  .then(userList=>{
+   data.D = userList.filter(user=>!user.bot).map(user=>user.username);
+  })
+   await message.reactions.resolve("🇪").users.fetch()
+  .then(userList=>{
+   data.E = userList.filter(user=>!user.bot).map(user=>user.username);
+  })
+  await message.reactions.resolve("🇫").users.fetch()
+  .then(userList=>{
+   data.F = userList.filter(user=>!user.bot).map(user=>user.username);
+  })
+  await message.reactions.resolve("🇬").users.fetch()
+  .then(userList=>{
+   data.G = userList.filter(user=>!user.bot).map(user=>user.username);
+  })
 
-   await message.reactions.resolve("🇨").users.fetch()
-   .then(userList=>{
-    data.C = userList.filter(user=>!user.bot).map(user=>user.username);
-   })
+  
 
-   await message.reactions.resolve("🇩").users.fetch()
-   .then(userList=>{
-    data.D = userList.filter(user=>!user.bot).map(user=>user.username);
-   })
-
-  await message.reactions.resolve("🇪").users.fetch()
-   .then(userList=>{
-    data.E = userList.filter(user=>!user.bot).map(user=>user.username);
-   })
-
-   await message.reactions.resolve("🇫").users.fetch()
-   .then(userList=>{
-    data.F = userList.filter(user=>!user.bot).map(user=>user.username);
-   })
-
-   await message.reactions.resolve("🇬").users.fetch()
-   .then(userList=>{
-    data.G = userList.filter(user=>!user.bot).map(user=>user.username);
-   })
- })
-
-return JSON.stringify(data);
- 
+  return JSON.stringify(data); 
+  
 }
 
 async function sendBossMessage(){
-  let bossChannel = await fetchBossChannel();
+  let bossChannel = fetchBossChannel();
   let oldBossMessage = await fetchBossMessage();
+  bossChannel.send("@everyone")
+  .then((message)=>{
+    message.delete();
+  })
 
-  let bossMessage  = "@everyone 新的一周開始了!!\r\n";
-      bossMessage += "請給反應你要哪隻boss~\r\n";
-      bossMessage += "🇦 : 寒冰魔女\r\n";
-      bossMessage += "🇧 : 森法王\r\n";
-      bossMessage += "🇨 : 夢魘虛影\r\n";
-      bossMessage += "🇩 : 淵海噬者\r\n";
-      bossMessage += "🇪 : 元素魔方\r\n";
-      bossMessage += "🇫 : 幻雪守衛\r\n";
-      bossMessage += "🇬 : 荒漠亡靈\r\n";
+  const embed = new Discord.MessageEmbed()
+  .setColor('#ffff00')
+  .setTitle('新的一周開始了!')
+  .setURL('https://billyovo.github.io/boss-list/index.html')
+  .setDescription('@everyone 請給反應你要哪隻boss~')
+  .addFields(
+    { name: '\u200b', value: '🇦 寒冰魔女', inline: true },
+    { name: '\u200b', value: '🇧 森法王', inline: true },
+    { name: '\u200b', value: '🇨 夢魘虛影', inline: true },
+    { name: '\u200b', value: '🇩 淵海噬者', inline: true },
+    { name: '\u200b', value: '🇪 元素魔方', inline: true },
+    { name: '\u200b', value: '🇫 幻雪守衛', inline: true },
+    { name: '\u200b', value: '🇬 荒漠亡靈', inline: true },
+  )
+  .setTimestamp()
+  .setFooter('新的一周快樂', bot.user.avatarURL());
 
   await oldBossMessage.unpin();
-  await bossChannel.send(bossMessage)
+  await bossChannel.send(embed)
   .then(async(newMessage)=>{
       await newMessage.pin();
       await newMessage.react("🇦");
@@ -144,7 +144,22 @@ bot.on('message', msg => {
     case "boss":{
       fetchEmote()
       .then(ret => {
-        msg.channel.send(ret);
+        ret = JSON.parse(ret);
+        const embed = new Discord.MessageEmbed()
+        .setColor('#ffff00')
+        .setTitle('本周的boss:')
+        .addFields(
+          { name: '\u200b', value: '🇦 '+ret.A.join(" ")},
+          { name: '\u200b', value: '🇧 '+ret.B.join(" ")},
+          { name: '\u200b', value: '🇨 '+ret.C.join(" ")},
+          { name: '\u200b', value: '🇩 '+ret.D.join(" ")},
+          { name: '\u200b', value: '🇪 '+ret.E.join(" ")},
+          { name: '\u200b', value: '🇫 '+ret.F.join(" ")},
+          { name: '\u200b', value: '🇬 '+ret.G.join(" ")},
+        )
+        .setTimestamp()
+        .setFooter('你好嗎~', bot.user.avatarURL());
+        msg.channel.send(embed);
       })
       .catch(error=>{
         console.log(error);
@@ -157,34 +172,39 @@ bot.on('message', msg => {
         msg.channel.send("No permission!");
       break;
     }
+    case "ping":{
+       const embed = new Discord.MessageEmbed()
+       .setColor('#ffff00')
+       .setTitle('Pong')
+       .setDescription(bot.ws.ping+'ms')
+       msg.channel.send(embed);
+      break;
+    }  
   }
 });
 
-/*
+
 const http = require("http");
-const host = 'localhost';
-const port = 8080;
+const host = '0.0.0.0';
+const port = process.env.PORT || 3000;
 
 const requestListener = function (req, res) {
-    res.setHeader("Content-Type", "application/json");
-    res.setHeader("Access-Control-Allow-Origin", process.env.ALLOW_DOMAIN);
-    res.writeHead(200);
-
-    fs.readFile('messageID.txt', function(err, data) {
-        if(err){
-            return console.log(err);
-        }
-        fetchEmote(data.toString())
-        .then(ret => {
-          res.end(ret);
-        });
-      });
     
+    if(req.method=="GET"){
+     res.setHeader("Content-Type", "application/json");
+     res.setHeader("Access-Control-Allow-Origin", process.env.ALLOW_DOMAIN); 
+    fetchEmote()
+    .then(ret => {
+      res.end(ret);
+    });
+    }
+  else{
+    res.writeHead(200);
+    res.end();
+  }
 };
 
 const server = http.createServer(requestListener);
 server.listen(port, host, () => {
     console.log(`HTTP Server is running on http://${host}:${port}`);
 });
-
-*/
