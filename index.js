@@ -9,22 +9,23 @@ const PREFIX = config.prefix;
 
 const bossChannelID = config.bossChannelID;
 const prefix_len = PREFIX.length;
+
+let bossMessageID;
 //'0 0 * * MON'
 var CronJob = require('cron').CronJob;
-var job = new CronJob('0 0 * * MON', function() {
-  sendBossMessage();
-}, null, true, 'Asia/Taipei');
+//var job = new CronJob('0 0 * * MON', function() {
+//  sendBossMessage();
+//}, null, true, 'Asia/Taipei');
 
 var keepAwake = new CronJob('*/25 * * * *', function() {
-	fetch("https://discord-bosslist-bot.herokuapp.com/",{method: "HEAD"})
+	fetch("https://billy-gay-bot.herokuapp.com/availability",{method: "HEAD"})
 	.then(response => {
 		console.log("bossBot's status: "+response.status+" "+response.statusText);
 	});
   }, null, true, 'Asia/Taipei');
 
 keepAwake.start();
-
-job.start();
+//job.start();
 
 bot.login(TOKEN);
 
@@ -39,6 +40,9 @@ bot.on('ready', () => {
       console.log("Boss channel is not found! Fix your config.");
       bot.destroy();
   }
+
+  bossMessageID = fetchBossMessage().id;
+  console.log(bossMessageID);
 });
 
 function fetchBossChannel(){
@@ -48,52 +52,8 @@ function fetchBossChannel(){
 async function fetchBossMessage(){
   let bossChannel = fetchBossChannel();
   let messages = await bossChannel.messages.fetchPinned();
-  let bossMessage = await bossChannel.messages.fetch(messages.filter(message => message.author === bot.user).first().id,true,true);
+  let bossMessage = await bossChannel.messages.fetch(messages.filter(message => message.author === bot.user || message.author.id === '534985012089716736').first().id,true,true);
   return bossMessage;
-}
-
-async function fetchEmote(){
-  let data = {
-      "A":[],
-      "B":[],
-      "C":[],
-      "D":[],
-      "E":[],
-      "F":[],
-      "G":[],
-  }
-  let message = await fetchBossMessage();
-
-  await message.reactions.resolve("🇦").users.fetch()
-  .then(userList=>{
-   data.A = userList.filter(user=>!user.bot).map(user=>user.username);
-   })
-  await message.reactions.resolve("🇧").users.fetch()
-  .then(userList=>{
-   data.B = userList.filter(user=>!user.bot).map(user=>user.username);
-  })
-  await message.reactions.resolve("🇨").users.fetch()
-  .then(userList=>{
-   data.C = userList.filter(user=>!user.bot).map(user=>user.username);
-  })
-  await message.reactions.resolve("🇩").users.fetch()
-  .then(userList=>{
-   data.D = userList.filter(user=>!user.bot).map(user=>user.username);
-  })
-   await message.reactions.resolve("🇪").users.fetch()
-  .then(userList=>{
-   data.E = userList.filter(user=>!user.bot).map(user=>user.username);
-  })
-  await message.reactions.resolve("🇫").users.fetch()
-  .then(userList=>{
-   data.F = userList.filter(user=>!user.bot).map(user=>user.username);
-  })
-  await message.reactions.resolve("🇬").users.fetch()
-  .then(userList=>{
-   data.G = userList.filter(user=>!user.bot).map(user=>user.username);
-  })
-
-  return JSON.stringify(data); 
 }
 
 async function sendBossMessage(){
@@ -132,8 +92,18 @@ async function sendBossMessage(){
       await newMessage.react("🇪");
       await newMessage.react("🇫");
       await newMessage.react("🇬");
-  })         
+      bossMessageID = await fetchBossMessage().id;
+  })  
+  
 }
+
+bot.on('messageReactionAdd', (reaction, user) => {
+  console.log('a reaction has been added');
+});
+
+bot.on('messageReactionRemove', (reaction, user) => {
+  console.log('a reaction has been removed');
+});
 
 bot.on('message', msg => {
 
@@ -143,52 +113,6 @@ bot.on('message', msg => {
   let command = msg.content.slice(prefix_len,msg.content.length).toLowerCase();
     
   switch(command){
-    case "boss":{
-      let timetable = new Array(7);
-      timetable[0] = ["A","B","C","D"];
-      timetable[1] = ["E","F","G","A"];
-      timetable[2] = ["B","C","D","E"];
-      timetable[3] = ["F","G","A","B"];
-      timetable[4] = ["C","D","E","F"];
-      timetable[5] = ["G","A","B","C"];
-      timetable[6] = ["D","E","F","G"];
-      
-      let weekday = new Array(7);
-      weekday[0] = "日";
-      weekday[1] = "一";
-      weekday[2] = "二";
-      weekday[3] = "三";
-      weekday[4] = "四";
-      weekday[5] = "五";
-      weekday[6] = "六";
-      
-      let today = new Date();
-      let weekIndex = today.getDay();
-      
-      fetchEmote()
-      .then(ret => {
-        ret = JSON.parse(ret);
-        const embed = new Discord.MessageEmbed()
-        .setColor('#ffff00')
-        .setTitle('本周的boss:')
-        .addFields(
-          { name: '\u200b', value: '🇦 '+ret.A.join(" ")},
-          { name: '\u200b', value: '🇧 '+ret.B.join(" ")},
-          { name: '\u200b', value: '🇨 '+ret.C.join(" ")},
-          { name: '\u200b', value: '🇩 '+ret.D.join(" ")},
-          { name: '\u200b', value: '🇪 '+ret.E.join(" ")},
-          { name: '\u200b', value: '🇫 '+ret.F.join(" ")},
-          { name: '\u200b', value: '🇬 '+ret.G.join(" ")},
-        )
-        .setTimestamp()
-        .setFooter('星期'+weekday[weekIndex]+'的boss 7:30 '+timetable[weekIndex][0]+' '+timetable[weekIndex][1]+' | 9:30 '+timetable[weekIndex][2]+ ' '+timetable[weekIndex][3], bot.user.avatarURL());
-        msg.channel.send(embed);
-      })
-      .catch(error=>{
-        console.log(error);
-      })
-      break;
-    }
     case "message":{
       msg.member.hasPermission('ADMINISTRATOR') ?
         sendBossMessage():
@@ -207,36 +131,50 @@ bot.on('message', msg => {
 });
 
 
-const http = require("http");
-const host = '0.0.0.0';
-const port = process.env.PORT || 3000;
+const { Client } = require('pg');
 
-const requestListener = function (req, res) {
-    if(req.url!="/"){
-      res.writeHead(404);
-      res.end();
-      return;
-    }
-    if(req.method=="GET"){
-      res.setHeader("Content-Type", "application/json");
-      res.setHeader("Access-Control-Allow-Origin", process.env.ALLOW_DOMAIN); 
-      fetchEmote()
-      .then(ret => {
-        res.writeHead(200);
-        res.end(ret);
-      })
-      .catch(()=>{
-        res.writeHead(502)
-        res.end();
-      })
-    }
-    else{
-      res.writeHead(200);
-      res.end();
-    }
-};
+const client = new Client({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
 
-const server = http.createServer(requestListener);
-server.listen(port, host, () => {
-    console.log(`API server online on http://${host}:${port}`);
+client.connect();
+
+
+const express = require('express');
+const bodyParser = require('body-parser');
+const app = express();
+app.use(bodyParser.urlencoded({ extended: true }));
+ 
+app.head ("/availability", function (req, res) {  //availability or keep awake
+  res.sendStatus(200);
+}) 
+
+app.get('/players', function (req, response) {  //get records
+  client.query('SELECT player.*, boss01.boss AS boss1, boss01.hitted AS hitted1, boss02.boss AS boss2, boss02.hitted AS hitted2 FROM player INNER JOIN boss01 ON player.name = boss01.name INNER JOIN boss02 ON player.name = boss02.name;', (err, res) => {
+    if (err) throw err;
+    response.status(200).send(res.rows);
+  });
+  
+})
+
+app.post('/players', (req, res) => {      //add records
+  console.log('Got body:', req.body);
+  res.sendStatus(200);
+});
+
+app.patch('/players', function (req, res) { //update records
+  res.sendStatus(200);
+})
+
+app.delete('/players', function (req, res) {  //delete records
+  res.sendStatus(200);
+})
+
+
+
+app.listen(process.env.PORT || 3000,()=>{
+  console.log("API is running.");
 });
